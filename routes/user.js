@@ -27,7 +27,7 @@ router.post('/login', async (req, res) => {
     const user = await User.findOne({ username: req.body.username });
     if (user && await bcrypt.compare(req.body.password, user.password)) {
       const token = jwt.sign({ _id: user._id }, secretKey, { expiresIn: '24h'});
-      res.send({message: 'connection OK', username: user.username, token: token});
+      res.send({message: 'connection OK', username: user.username, token: token, userId: user._id });
     } else {
       res.status(400).send('Invalid Credentials');
     }

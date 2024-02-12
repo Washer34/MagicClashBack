@@ -1,2 +1,0 @@
-SECRET_KEY = 'antoinesecretkey';
-DB_URI = 'mongodb+srv://washer34:re78er03@cluster0.peqzmvv.mongodb.net/MagicClash'
