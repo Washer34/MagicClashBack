@@ -85,8 +85,8 @@ export default function (io) {
   router.get("/:id", authenticateToken, async (req, res) => {
     try {
       const game = await Game.findById(req.params.id)
-        .populate("player1", "username") // Assurez-vous d'avoir un champ player1 dans votre modèle
-        .populate("player2", "username"); // Assurez-vous d'avoir un champ player2 dans votre modèle
+        .populate("player1", "username")
+        .populate("player2", "username");
       if (!game) {
         return res.status(404).json({ error: "Room non trouvée" });
       }
@@ -97,7 +97,7 @@ export default function (io) {
       gameObj.isCreator =
         req.user._id.toString() === gameObj.creator.toString();
       // Supprimer les champs inutiles ou sensibles avant de renvoyer la réponse
-      delete gameObj.__v; // Exemple de suppression d'un champ inutile
+      delete gameObj.__v;
 
       res.status(200).json(gameObj);
     } catch (error) {
@@ -119,7 +119,7 @@ export default function (io) {
       console.log(newGame);
 
       await newGame.save();
-      io.emit("gameCreated", newGame); // Utilisez directement 'io' ici
+      io.emit("gameCreated", newGame);
       res.status(201).json(newGame);
     } catch (error) {
       res

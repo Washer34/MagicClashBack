@@ -11,6 +11,8 @@ export default function initializeSocketIO(server) {
     },
   });
 
+  const roomsReadyState = {};
+
   io.on("connection", (socket) => {
     console.log("Un utilisateur s'est connecté");
 
@@ -19,30 +21,100 @@ export default function initializeSocketIO(server) {
       console.log(`Utilisateur ${socket.id} a rejoint la salle ${roomId}`);
     });
 
-    socket.on("startGame", async ({ roomId }) => {
-      // Informer tous les clients dans la room que le jeu a commencé
-      io.to(roomId).emit("gameStarted");
+    socket.on("leaveRoom", async ({ roomId, userId }) => {
+      console.log('utilisateur quitte la partie')
+      try {
+        const game = await Game.findById(roomId);
+        if (!game) {
+          console.log("Partie non trouvée");
+          return;
+        }
+
+        let isCreatorChanged = false;
+        if (game.player1 && game.player1.toString() === userId) {
+          game.player1 = null;
+          if (game.player2) {
+            game.player1 = game.player2;
+            game.player2 = null;
+            game.creator = game.player1;
+            isCreatorChanged = true;
+          }
+        } else if (game.player2 && game.player2.toString() === userId) {
+          game.player2 = null;
+        }
+
+        await game.save();
+
+        io.to(roomId).emit("playerLeft", userId);
+
+        if (isCreatorChanged && game.player1) {
+          io.to(game.player1.toString()).emit("isCreator", true);
+        }
+
+        if (!game.player1) {
+          await Game.deleteOne({ _id: roomId });
+          io.emit("gameDeleted", { gameId: roomId });
+        } else {
+          const updatedRoomDetails = await Game.findById(roomId)
+            .populate("player1", "username")
+            .populate("player2", "username");
+          io.to(roomId).emit("updateRoom", updatedRoomDetails);
+        }
+      } catch (error) {
+        console.error(
+          "Erreur lors de la tentative de sortie de la partie:",
+          error
+        );
+      }
     });
 
-    socket.on("gameReady", async ({ roomId, userId }) => {
-      const game = await Game.findById(roomId);
-      if (game.creator.toString() !== userId.toString()) {
-        return;
+    socket.on("gameReady", async ({ roomId }) => {
+      console.log(`la room ${roomId} est prête`);
+      io.to(roomId).emit("gameReadyResponse");
+    });
+
+    socket.on("playerReady", async ({ roomId, userId }) => {
+      console.log("un joueur est prêt")
+      console.log(roomId);
+      console.log(userId);
+      if (!roomsReadyState[roomId]) {
+        roomsReadyState[roomId] = new Set();
       }
+      roomsReadyState[roomId].add(userId);
+
+      const game = await Game.findById(roomId);
+      // Vérifier si tous les joueurs sont prêts
+      if (
+        game &&
+        roomsReadyState[roomId].size === (game.player1 && game.player2 ? 2 : 1)
+      ) {
+        console.log("je démarre la game");
+        // Tous les joueurs sont prêts, démarrez le jeu
+        startGame(roomId, game, io);
+      }
+    });
+
+    async function startGame(roomId, game, io) {
       try {
+        // Distribuez les cartes pour chaque joueur
         const player1Hand = await distributeCards(game.player1Deck);
         const player2Hand = await distributeCards(game.player2Deck);
 
-        game.player1Hand = player1Hand;
-        game.player2Hand = player2Hand;
-        await game.save();
-
-        io.to(roomId).emit("handsDistributed", { player1Hand, player2Hand });
+        // Émettez 'handsDistributed' pour chaque joueur avec leur main respective
+        io.to(game.player1.toString()).emit("handsDistributed", {
+          playerId: game.player1,
+          hand: player1Hand,
+        });
+        console.log("main 1 envoyée à:", game.player1);
+        io.to(game.player2.toString()).emit("handsDistributed", {
+          playerId: game.player2,
+          hand: player2Hand,
+        });
+        console.log("main 2 envoyée")
       } catch (error) {
-        console.error("erreur: ", error);
+        console.error("Erreur lors de la distribution des cartes:", error);
       }
-      console.log(`Le jeu dans la salle ${roomId} commence`);
-    });
+    }
 
     socket.on("deckSelected", async ({ roomId, deckId, userId }) => {
       try {
