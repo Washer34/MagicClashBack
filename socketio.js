@@ -1,148 +1,237 @@
-// socketio.js
 import { Server } from "socket.io";
-import { distributeCards } from "./helpers/gameHelpers.js";
 import Game from "./models/Game.js";
+import {
+  deleteGame,
+  distributeInitialCards,
+  shuffle,
+  createGame,
+  joinGame,
+} from "./helpers/gameHelpers.js";
 
 export default function initializeSocketIO(server) {
   const io = new Server(server, {
     cors: {
-      origin: "http://localhost:5173", // ou l'URL de votre front-end
+      origin: "http://localhost:5173",
       methods: ["GET", "POST"],
     },
   });
 
-  const roomsReadyState = {};
+  let userSockets = {};
 
   io.on("connection", (socket) => {
-    console.log("Un utilisateur s'est connecté");
+    console.log(`Un utilisateur s'est connecté: ${socket.id}`);
 
-    socket.on("joinRoom", ({ roomId }) => {
-      socket.join(roomId);
-      console.log(`Utilisateur ${socket.id} a rejoint la salle ${roomId}`);
+    socket.on("register", (userId) => {
+      userSockets[userId] = socket.id;
+      console.log(
+        `l'utilisateur ${userId} est connecté au socket: ${socket.id}`
+      );
+
+      socket.on("disconnect", () => {
+        delete userSockets[userId];
+      });
     });
 
-    socket.on("leaveRoom", async ({ roomId, userId }) => {
-      console.log('utilisateur quitte la partie')
+    socket.on("createGame", async (data) => {
       try {
-        const game = await Game.findById(roomId);
+        const game = await createGame(data);
+        socket.join(game._id.toString());
+        socket.emit("gameCreatedForCreator", {
+          gameId: game._id,
+          message: "Partie créée et rejointe avec succès.",
+        });
+        io.emit("gameCreated", game);
+      } catch (error) {
+        socket.emit("erreur", {
+          message: "Erreur lors de la création de la partie",
+        });
+      }
+    });
+
+    socket.on("selectDeck", async (data) => {
+      const { deck, roomId, playerId } = data;
+      try {
+        let game = await Game.findById(roomId);
+
         if (!game) {
-          console.log("Partie non trouvée");
+          socket.emit("erreur", { message: "la partie n'existe pas." });
+          return;
+        }
+        const playerIndex = game.players.findIndex(
+          (p) => p.user.toString() === playerId
+        );
+        if (playerIndex !== -1) {
+          game.players[playerIndex].deck = deck;
+          await game.save();
+
+          const updatedGame = await Game.findById(roomId).populate(
+            "players.user",
+            "username"
+          );
+          io.to(roomId).emit("gameUpdated", updatedGame.toObject());
+        } else {
+          socket.emit("erreur", {
+            message: "Joueur non trouvé dans la partie.",
+          });
+        }
+      } catch (error) {
+        socket.emit("erreur", {
+          message: "Erreur lors de la tentative de selection du deck",
+        });
+      }
+    });
+
+    socket.on("joinGame", async (data) => {
+      const { gameId, playerId } = data;
+      try {
+        const game = await joinGame(gameId, playerId);
+        socket.join(gameId);
+
+        const gameDetails = game.toObject();
+        io.to(gameId).emit("gameUpdated", gameDetails);
+      } catch (error) {
+        socket.emit("erreur", {
+          message: "Erreur lors de la tentative de rejoindre la partie",
+        });
+      }
+    });
+
+    socket.on("leaveGame", async ({ roomId, playerId }) => {
+      try {
+        let game = await Game.findById(roomId);
+
+        if (!game) {
+          socket.emit("erreur", { message: "La partie n'existe pas." });
           return;
         }
 
-        let isCreatorChanged = false;
-        if (game.player1 && game.player1.toString() === userId) {
-          game.player1 = null;
-          if (game.player2) {
-            game.player1 = game.player2;
-            game.player2 = null;
-            game.creator = game.player1;
-            isCreatorChanged = true;
-          }
-        } else if (game.player2 && game.player2.toString() === userId) {
-          game.player2 = null;
-        }
-
-        await game.save();
-
-        io.to(roomId).emit("playerLeft", userId);
-
-        if (isCreatorChanged && game.player1) {
-          io.to(game.player1.toString()).emit("isCreator", true);
-        }
-
-        if (!game.player1) {
+        if (game.creator.toString() === playerId) {
           await Game.deleteOne({ _id: roomId });
-          io.emit("gameDeleted", { gameId: roomId });
+          io.to(roomId).emit("roomClosed", {
+            message: "La partie a été fermée par le créateur.",
+          });
+          io.emit("gameDeleted", { roomId });
         } else {
-          const updatedRoomDetails = await Game.findById(roomId)
-            .populate("player1", "username")
-            .populate("player2", "username");
-          io.to(roomId).emit("updateRoom", updatedRoomDetails);
+          console.log("playerId", playerId);
+          game.players = game.players.filter(
+            (p) => p.user.toString() !== playerId
+          );
+          await game.save();
+
+          game = await Game.findById(roomId).populate(
+            "players.user",
+            "username"
+          );
+          const gameDetails = game.toObject();
+
+          io.to(roomId).emit("gameUpdated", gameDetails);
         }
+
+        socket.leave(roomId);
+      } catch (error) {
+        console.error("Erreur lors de la gestion de leaveRoom:", error);
+        socket.emit("erreur", {
+          message: "Erreur lors du traitement de la demande de départ.",
+        });
+      }
+    });
+
+    socket.on("deleteGame", async ({ gameId }) => {
+      try {
+        await deleteGame(gameId);
+        io.emit("gameDeleted", { gameId });
+      } catch (error) {
+        socket.emit("erreur", {
+          message: "Erreur lors de la suppression de la partie",
+        });
+      }
+    });
+
+    socket.on("requestGameDetails", async ({ roomId }) => {
+      try {
+        const game = await Game.findById(roomId)
+          .populate("players.user", "username")
+          .exec();
+
+        if (!game) {
+          socket.emit("erreur", { message: "La partie n'existe pas." });
+          return;
+        }
+
+        const gameDetails = game.toObject();
+
+        socket.emit("gameDetails", gameDetails);
       } catch (error) {
         console.error(
-          "Erreur lors de la tentative de sortie de la partie:",
+          "Erreur lors de la récupération des détails de la partie:",
           error
         );
-      }
-    });
-
-    socket.on("gameReady", async ({ roomId }) => {
-      console.log(`la room ${roomId} est prête`);
-      io.to(roomId).emit("gameReadyResponse");
-    });
-
-    socket.on("playerReady", async ({ roomId, userId }) => {
-      console.log("un joueur est prêt")
-      console.log(roomId);
-      console.log(userId);
-      if (!roomsReadyState[roomId]) {
-        roomsReadyState[roomId] = new Set();
-      }
-      roomsReadyState[roomId].add(userId);
-
-      const game = await Game.findById(roomId);
-      // Vérifier si tous les joueurs sont prêts
-      if (
-        game &&
-        roomsReadyState[roomId].size === (game.player1 && game.player2 ? 2 : 1)
-      ) {
-        console.log("je démarre la game");
-        // Tous les joueurs sont prêts, démarrez le jeu
-        startGame(roomId, game, io);
-      }
-    });
-
-    async function startGame(roomId, game, io) {
-      try {
-        // Distribuez les cartes pour chaque joueur
-        const player1Hand = await distributeCards(game.player1Deck);
-        const player2Hand = await distributeCards(game.player2Deck);
-
-        // Émettez 'handsDistributed' pour chaque joueur avec leur main respective
-        io.to(game.player1.toString()).emit("handsDistributed", {
-          playerId: game.player1,
-          hand: player1Hand,
+        socket.emit("erreur", {
+          message: "Erreur lors de la récupération des détails de la partie.",
         });
-        console.log("main 1 envoyée à:", game.player1);
-        io.to(game.player2.toString()).emit("handsDistributed", {
-          playerId: game.player2,
-          hand: player2Hand,
-        });
-        console.log("main 2 envoyée")
-      } catch (error) {
-        console.error("Erreur lors de la distribution des cartes:", error);
       }
-    }
+    });
 
-    socket.on("deckSelected", async ({ roomId, deckId, userId }) => {
+    socket.on("startGame", async ({ roomId }) => {
       try {
-        const game = await Game.findById(roomId);
+        const game = await Game.findById(roomId).populate(
+          "players.user players.deck"
+        );
 
-        if (game.player1.toString() === userId) {
-          game.player1Deck = deckId;
-        } else if (game.player2.toString() === userId) {
-          game.player2Deck = deckId;
+        if (!game) {
+          socket.emit("erreur", { message: "La partie n'existe pas." });
+          return;
         }
 
-        await game.save();
+        for (const player of game.players) {
+          if (!player.deck) {
+            socket.emit("erreur", {
+              message: "Tous les joueurs n'ont pas sélectionné de deck.",
+            });
+            return;
+          }
+        }
+        await distributeInitialCards(roomId);
 
-        io.to(roomId).emit("deckSelectionUpdated", {
-          player1Deck: game.player1Deck,
-          player2Deck: game.player2Deck,
-        });
-        console.log(
-          `Deck ${deckId} sélectionné pour la salle ${roomId} par l'utilisateur ${userId}`
+        const updatedGame = await Game.findById(roomId).populate(
+          "players.user players.deck"
         );
+
+        updatedGame.players.forEach(async (player) => {
+          const userSocketId = userSockets[player.user._id.toString()];
+          if (userSocketId) {
+            const playerGameInfo = {
+              hand: player.hand,
+            };
+            io.to(userSocketId).emit("handDealt", playerGameInfo);
+          }
+        });
+
+        io.to(roomId).emit("gameStarted");
       } catch (error) {
-        console.error("Erreur lors de la sélection du deck", error);
-        // Gérer l'erreur appropriément
+        socket.emit("erreur", {
+          message: "Erreur lors du lancement de la partie",
+        });
       }
     });
 
-    socket.on("disconnect", () => {
-      console.log("Un utilisateur s'est déconnecté");
+    socket.on("drawCard", async ({ gameId, playerId }) => {
+      const game = await Game.findById(gameId).populate("players.user");
+      const player = game.players.find(
+        (p) => p.user._id.toString() === playerId
+      );
+
+      if (player && player.restOfTheDeck.length > 0) {
+        const card = player.restOfTheDeck.shift();
+        player.hand.push(card);
+        await game.save();
+
+        io.to(player.user._id.toString()).emit("drawnCard", card);
+      } else {
+        io.to(player.user._id.toString()).emit("drawError", {
+          message: "Aucune carte restante à piocher",
+        });
+      }
     });
   });
 

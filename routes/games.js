@@ -84,19 +84,16 @@ export default function (io) {
 
   router.get("/:id", authenticateToken, async (req, res) => {
     try {
-      const game = await Game.findById(req.params.id)
-        .populate("player1", "username")
-        .populate("player2", "username");
+      const game = await Game.findById(req.params.id).populate(
+        "players.user",
+        "username"
+      );
       if (!game) {
         return res.status(404).json({ error: "Room non trouvée" });
       }
 
       // Transformer le document mongoose en objet JS
       const gameObj = game.toObject();
-      // Ajouter un champ isCreator pour déterminer si l'utilisateur actuel est le créateur
-      gameObj.isCreator =
-        req.user._id.toString() === gameObj.creator.toString();
-      // Supprimer les champs inutiles ou sensibles avant de renvoyer la réponse
       delete gameObj.__v;
 
       res.status(200).json(gameObj);
