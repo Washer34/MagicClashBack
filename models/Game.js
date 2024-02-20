@@ -33,6 +33,7 @@ const gameSchema = new mongoose.Schema({
     default: "waiting",
   },
   players: [playerSchema],
+  playersReady: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
   createdAt: {
     type: Date,
     default: Date.now,
