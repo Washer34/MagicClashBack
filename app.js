@@ -25,10 +25,6 @@ async function startApp() {
   app.use("/api/games", gameRoutes(io));
   app.use("/api", cardsRoutes);
 
-  app.get("/", (req, res) => {
-    res.send("Hello World!");
-  });
-
   const PORT = process.env.PORT || 3000;
   server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 }
