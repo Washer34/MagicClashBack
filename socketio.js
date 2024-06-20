@@ -1,4 +1,3 @@
-// socketio.js
 import { Server } from "socket.io";
 import { v4 as uuidv4 } from 'uuid';
 
@@ -20,7 +19,7 @@ function getActiveGamesList() {
 export default function initializeSocketIO(server) {
   const io = new Server(server, {
     cors: {
-      origin: "http://localhost:5173",
+      origin: process.env.FRONT_END,
       methods: ["GET", "POST"],
     },
   });
