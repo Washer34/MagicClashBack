@@ -89,6 +89,24 @@ class Game {
     }
     console.log("j'update les infos ingame");
   }
+
+  moveCard(username, cardId, position) {
+    const player = this.players.find((p) => p.username === username);
+    if (player) {
+      player.moveCard(cardId, position);
+      const mirroredPosition = { x: position.x, y: 1000 - position.y };
+
+      const opponent = this.players.find((p) => p.username !== username);
+      if (opponent) {
+        const card = opponent.battlefield.find((c) => c.scryfallId === cardId);
+        if (card) {
+          card.position = mirroredPosition;
+        }
+      }
+
+      this.inGameUpdate();
+    }
+  }
 }
 
 export default Game;

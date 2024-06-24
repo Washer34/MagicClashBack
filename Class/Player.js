@@ -36,16 +36,29 @@ class Player {
     this.isReady = !this.isReady;
   }
 
+  moveCard(cardId, position) {
+    const card = this.battlefield.find((c) => c.scryfallId === cardId);
+    if (card) {
+      card.position = position;
+      console.log("position: ", position)
+    }
+  }
+
   getPublicInfos() {
     return {
       username: this.username,
       hand: this.hand.length,
       life: this.life,
       library: this.library.length,
-      battlefield: this.battlefield,
+      battlefield: this.battlefield.map((card) => ({
+        scryfallId: card.scryfallId,
+        imageUrl: card.imageUrl,
+        name: card.name,
+        position: card.position || { x: 0, y: 0 },
+      })),
       graveyard: this.graveyard,
       exile: this.exile,
-    }
+    };
   }
 
   getPrivateInfos() {
@@ -54,10 +67,15 @@ class Player {
       hand: this.hand,
       exile: this.exile,
       graveyard: this.graveyard,
-      battlefield: this.battlefield,
+      battlefield: this.battlefield.map((card) => ({
+        scryfallId: card.scryfallId,
+        imageUrl: card.imageUrl,
+        name: card.name,
+        position: card.position || { x: 0, y: 0 },
+      })),
       library: this.library.length,
-      life: this.life
-    }
+      life: this.life,
+    };
   }
 }
 
