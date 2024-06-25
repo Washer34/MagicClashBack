@@ -90,15 +90,15 @@ class Game {
     console.log("j'update les infos ingame");
   }
 
-  moveCard(username, cardId, position) {
+  moveCard(username, cardUuid, position) {
     const player = this.players.find((p) => p.username === username);
     if (player) {
-      player.moveCard(cardId, position);
+      player.moveCard(cardUuid, position);
       const mirroredPosition = { x: position.x, y: 1000 - position.y };
 
       const opponent = this.players.find((p) => p.username !== username);
       if (opponent) {
-        const card = opponent.battlefield.find((c) => c.scryfallId === cardId);
+        const card = opponent.battlefield.find((c) => c.uuid === cardUuid);
         if (card) {
           card.position = mirroredPosition;
         }
@@ -107,6 +107,7 @@ class Game {
       this.inGameUpdate();
     }
   }
+
 }
 
 export default Game;

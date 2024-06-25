@@ -1,3 +1,5 @@
+import { v4 as uuidv4 } from "uuid";
+
 class Player {
   constructor(username) {
     this.username = username;
@@ -13,7 +15,10 @@ class Player {
 
   setDeck(deck) {
     this.deck = deck;
-    this.library = [...deck.cards];
+    this.library = deck.cards.map((card) => ({
+      ...card.toObject(),
+      uuid: uuidv4(),
+    }));
     this.shuffleDeck();
   }
 
@@ -36,11 +41,11 @@ class Player {
     this.isReady = !this.isReady;
   }
 
-  moveCard(cardId, position) {
-    const card = this.battlefield.find((c) => c.scryfallId === cardId);
+  moveCard(cardUuid, position) {
+    const card = this.battlefield.find((c) => c.uuid === cardUuid);
     if (card) {
       card.position = position;
-      console.log("position: ", position)
+      console.log("position: ", position);
     }
   }
 
@@ -51,6 +56,7 @@ class Player {
       life: this.life,
       library: this.library.length,
       battlefield: this.battlefield.map((card) => ({
+        uuid: card.uuid,
         scryfallId: card.scryfallId,
         imageUrl: card.imageUrl,
         name: card.name,
@@ -68,6 +74,7 @@ class Player {
       exile: this.exile,
       graveyard: this.graveyard,
       battlefield: this.battlefield.map((card) => ({
+        uuid: card.uuid,
         scryfallId: card.scryfallId,
         imageUrl: card.imageUrl,
         name: card.name,

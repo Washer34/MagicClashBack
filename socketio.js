@@ -206,9 +206,7 @@ export default function initializeSocketIO(server) {
 
       const player = game.players.find((p) => p.username === socket.username);
       if (player) {
-        const cardIndex = player.hand.findIndex(
-          (c) => c.scryfallId === card.scryfallId
-        );
+        const cardIndex = player.hand.findIndex((c) => c.uuid === card.uuid);
         if (cardIndex !== -1) {
           const [playedCard] = player.hand.splice(cardIndex, 1);
           player.battlefield.push(playedCard);
@@ -218,13 +216,28 @@ export default function initializeSocketIO(server) {
     });
 
     socket.on("move card", ({ gameId, userId, cardId, position }) => {
-      console.log("Move card", ({ gameId, userId, cardId, position }))
       const game = activeGames[gameId];
       if (game) {
         const user = game.players.find((p) => p.username === socket.username);
         if (user) {
           game.moveCard(socket.username, cardId, position);
         }
+      }
+    });
+
+    socket.on("draw x cards", ({ gameId, userId, number }) => {
+      const game = activeGames[gameId];
+      if (!game) {
+        socket.emit("error", "Game not found");
+        return;
+      }
+
+      const player = game.players.find((p) => p.username === socket.username);
+      if (player) {
+        for (let i = 0; i < number; i++) {
+          player.drawCard();
+        }
+        game.inGameUpdate();
       }
     });
 
