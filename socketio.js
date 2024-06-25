@@ -241,6 +241,39 @@ export default function initializeSocketIO(server) {
       }
     });
 
+    socket.on("look at library", ({ gameId, userId, number }) => {
+      const game = activeGames[gameId];
+      if (!game) {
+        socket.emit("error", "Game not found");
+        return;
+      }
+
+      const player = game.players.find((p) => p.username === socket.username);
+      if (player) {
+        const cardsToShow = number
+          ? player.library.slice(0, number)
+          : player.library;
+        socket.emit("library cards", cardsToShow);
+      }
+    });
+
+    socket.on("tap card", ({ gameId, userId, cardId, tap }) => {
+      const game = activeGames[gameId];
+      if (!game) {
+        socket.emit("error", "Game not found");
+        return;
+      }
+
+      const player = game.players.find((p) => p.username === socket.username);
+      if (player) {
+        const card = player.battlefield.find((c) => c.uuid === cardId);
+        if (card) {
+          card.tap = tap;
+          game.inGameUpdate();
+        }
+      }
+    });
+
     socket.on("disconnect", () => {
       console.log(`Un utilisateur s'est déconnecté: ${socket.id}`);
     });

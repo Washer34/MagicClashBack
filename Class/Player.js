@@ -18,6 +18,7 @@ class Player {
     this.library = deck.cards.map((card) => ({
       ...card.toObject(),
       uuid: uuidv4(),
+      tap: false,
     }));
     this.shuffleDeck();
   }
@@ -60,6 +61,7 @@ class Player {
         scryfallId: card.scryfallId,
         imageUrl: card.imageUrl,
         name: card.name,
+        tap: card.tap,
         position: card.position || { x: 0, y: 0 },
       })),
       graveyard: this.graveyard,
@@ -78,6 +80,7 @@ class Player {
         scryfallId: card.scryfallId,
         imageUrl: card.imageUrl,
         name: card.name,
+        tap: card.tap,
         position: card.position || { x: 0, y: 0 },
       })),
       library: this.library.length,
