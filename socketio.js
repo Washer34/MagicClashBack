@@ -274,6 +274,26 @@ export default function initializeSocketIO(server) {
       }
     });
 
+    socket.on("move to graveyard", ({ gameId, userId, cardId }) => {
+      const game = activeGames[gameId];
+      if (!game) {
+        socket.emit("error", "Game not found");
+        return;
+      }
+
+      const player = game.players.find((p) => p.username === socket.username);
+      if (player) {
+        const cardIndex = player.battlefield.findIndex(
+          (c) => c.uuid === cardId
+        );
+        if (cardIndex !== -1) {
+          const [movedCard] = player.battlefield.splice(cardIndex, 1);
+          player.graveyard.push(movedCard);
+          game.inGameUpdate();
+        }
+      }
+    });
+
     socket.on("disconnect", () => {
       console.log(`Un utilisateur s'est déconnecté: ${socket.id}`);
     });
