@@ -46,8 +46,13 @@ class Player {
     const card = this.battlefield.find((c) => c.uuid === cardUuid);
     if (card) {
       card.position = position;
-      console.log("position: ", position);
+      console.log("position:", position);
     }
+  }
+
+  changeLife(amount) {
+    this.life += amount;
+    if (this.life < 0) this.life = 0;
   }
 
   getPublicInfos() {
@@ -62,7 +67,7 @@ class Player {
         imageUrl: card.imageUrl,
         name: card.name,
         tap: card.tap,
-        position: card.position || { x: 0, y: 0 },
+        position: card.position || { x: 50, y: 50 },
       })),
       graveyard: this.graveyard,
       exile: this.exile,
@@ -81,7 +86,7 @@ class Player {
         imageUrl: card.imageUrl,
         name: card.name,
         tap: card.tap,
-        position: card.position || { x: 0, y: 0 },
+        position: card.position || { x: 50, y: 50 },
       })),
       library: this.library.length,
       life: this.life,
