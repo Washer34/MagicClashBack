@@ -46,7 +46,6 @@ class Player {
     const card = this.battlefield.find((c) => c.uuid === cardUuid);
     if (card) {
       card.position = position;
-      console.log("position:", position);
     }
   }
 

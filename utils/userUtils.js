@@ -32,3 +32,9 @@ export async function getPlayerByUserId(gameId, userId) {
     throw new Error("Error retrieving player");
   }
 }
+
+export const capitalizeFirstLetter = (string) => {
+  return string.charAt(0).match(/[a-z]/i)
+    ? string.charAt(0).toUpperCase() + string.slice(1)
+    : string;
+};

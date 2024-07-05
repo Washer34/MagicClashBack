@@ -84,6 +84,20 @@ export function handleGameConnections(io, socket) {
     }
   });
 
+  socket.on("chat message", ({ gameId, message }) => {
+    try {
+      const game = Game.getGameById(gameId);
+      if (game) {
+        game.sendLogMessage(message);
+      } else {
+        socket.emit("error", "Game not found");
+      }
+    } catch (error) {
+      console.error("Erreur lors de l'envoi du message de chat: ", error);
+      socket.emit("error", "Erreur lors de l'envoi du message de chat");
+    }
+  });
+
   socket.on("play card", ({ gameId, userId, card }) => {
     try {
       const game = Game.getGameById(gameId);
@@ -115,10 +129,7 @@ export function handleGameConnections(io, socket) {
     try {
       const player = await getPlayerByUserId(gameId, userId);
       const game = Game.getGameById(gameId);
-      for (let i = 0; i < number; i++) {
-        player.drawCard();
-      }
-      game.inGameUpdate();
+      game.drawCards(player.username, number);
     } catch (error) {
       console.error("Erreur lors de la pioche des cartes: ", error);
       socket.emit("error", "Erreur lors de la pioche des cartes");

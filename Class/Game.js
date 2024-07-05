@@ -1,6 +1,7 @@
 import Player from "./Player.js";
 import { activeGames } from "../globalState.js";
 import User from "../models/User.js";
+import { capitalizeFirstLetter } from "../utils/userUtils.js";
 
 class Game {
   constructor(gameId, hostUsername, io) {
@@ -81,7 +82,10 @@ class Game {
       if (cardIndex !== -1) {
         const [playedCard] = player.hand.splice(cardIndex, 1);
         player.battlefield.push(playedCard);
-        this.sendLogMessage(`${username} joue la carte ${playedCard.name}`);
+        this.sendLogMessage({
+          username: capitalizeFirstLetter(username),
+          text: `joue la carte ${playedCard.name}`,
+        });
         this.inGameUpdate();
       } else {
         console.error("Card not found in hand");
@@ -134,13 +138,14 @@ class Game {
   lookAtLibrary(player, number) {
     const cards =
       number === null ? player.library : player.library.slice(0, number);
-    this.sendLogMessage(
-      `${player.username} regarde ${
+    this.sendLogMessage({
+      username: capitalizeFirstLetter(player.username),
+      text: `regarde ${
         number
           ? `les ${number} premières cartes de sa bibliothèque`
           : "sa bibliothèque"
-      }`
-    );
+      }`,
+    });
     return cards;
   }
 
@@ -158,8 +163,10 @@ class Game {
 
     if (card) {
       player.graveyard.push(card);
-      this.sendLogMessage(`${player.username} met ${card.name} au cimetière`);
-      console.log(`La carte ${card.name} a été déplacée vers le cimetière.`);
+      this.sendLogMessage({
+        username: capitalizeFirstLetter(player.username),
+        text: `met ${card.name} au cimetière`,
+      });
       this.inGameUpdate();
     } else {
       console.error(`La carte avec l'ID ${cardId} n'a pas été trouvée.`);
@@ -181,9 +188,11 @@ class Game {
 
     if (card) {
       player.exile.push(card);
-      this.sendLogMessage(`${player.username} exile ${card.name}`);
+      this.sendLogMessage({
+        username: capitalizeFirstLetter(player.username),
+        text: `exile ${card.name}`,
+      });
       this.inGameUpdate();
-      console.log(`La carte ${card.name} a été déplacée vers l'exil.`);
     } else {
       console.error(`La carte avec l'ID ${cardId} n'a pas été trouvée.`);
     }
@@ -194,9 +203,24 @@ class Game {
     const card = player.battlefield.find((card) => card.uuid === cardId);
     if (card) {
       card.tap = tap;
-      this.sendLogMessage(
-        `${player.username} ${tap ? "engage" : "désengage"} ${card.name}`
-      );
+      this.sendLogMessage({
+        username: capitalizeFirstLetter(player.username),
+        text: `${tap ? "engage" : "désengage"} ${card.name}`,
+      });
+      this.inGameUpdate();
+    }
+  }
+
+  drawCards(username, number) {
+    const player = this.players.find((p) => p.username === username);
+    if (player) {
+      for (let i = 0; i < number; i++) {
+        player.drawCard();
+      }
+      this.sendLogMessage({
+        username: capitalizeFirstLetter(username),
+        text: `pioche ${number} carte${number > 1 ? "s" : ""}`,
+      });
       this.inGameUpdate();
     }
   }
@@ -219,11 +243,20 @@ class Game {
     const player = this.players.find((p) => p.username === targetUsername);
     if (player) {
       player.changeLife(amount);
-      this.sendLogMessage(
-        `${changedBy} ${amount > 0 ? "augmente" : "diminue"} la vie de ${
-          player.username
-        } de ${Math.abs(amount)} point${Math.abs(amount) > 1 ? "s" : ""}`
-      );
+      const action = amount > 0 ? "augmente" : "diminue";
+      const logMessage =
+        changedBy === targetUsername
+          ? {
+              username: capitalizeFirstLetter(changedBy),
+              text: `${action} sa vie de ${Math.abs(amount)}`,
+            }
+          : {
+              username: capitalizeFirstLetter(changedBy),
+              text: `${action} la vie de ${capitalizeFirstLetter(
+                player.username
+              )} de ${Math.abs(amount)}`,
+            };
+      this.sendLogMessage(logMessage);
       this.inGameUpdate();
     } else {
       console.error(`Player ${targetUsername} not found`);
