@@ -151,7 +151,7 @@ class Game {
 
   moveToGraveyard(player, cardId) {
     let card = null;
-    const zones = ["hand", "battlefield", "exile"];
+    const zones = ["hand", "battlefield", "exile", "library"];
 
     for (const zone of zones) {
       const index = player[zone].findIndex((c) => c.uuid === cardId);
@@ -176,7 +176,7 @@ class Game {
 
   moveToExile(player, cardId) {
     let card = null;
-    const zones = ["hand", "battlefield", "graveyard"];
+    const zones = ["hand", "battlefield", "graveyard", "library"];
 
     for (const zone of zones) {
       const index = player[zone].findIndex((c) => c.uuid === cardId);
@@ -197,6 +197,30 @@ class Game {
       console.error(`La carte avec l'ID ${cardId} n'a pas été trouvée.`);
     }
     this.inGameUpdate();
+  }
+
+  moveToHand(player, cardId) {
+    let card = null;
+    const zones = ["battlefield", "graveyard", "exile", "library"];
+
+    for (const zone of zones) {
+      const index = player[zone].findIndex((c) => c.uuid === cardId);
+      if (index !== -1) {
+        card = player[zone].splice(index, 1)[0];
+        break;
+      }
+    }
+
+    if (card) {
+      player.hand.push(card);
+      this.sendLogMessage({
+        username: capitalizeFirstLetter(player.username),
+        text: `renvoie ${card.name} à la main`,
+      });
+      this.inGameUpdate();
+    } else {
+      console.error(`La carte avec l'ID ${cardId} n'a pas été trouvée.`);
+    }
   }
 
   tapCard(player, cardId, tap) {

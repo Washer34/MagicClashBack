@@ -37,10 +37,15 @@ export function handleGameConnections(io, socket) {
       }
 
       const response = game.startGame();
+
       if (response.error) {
         socket.emit("error", response.error);
       } else {
         io.to(gameId).emit("game started", response);
+
+        const allCards = game.players.flatMap((player) => player.deck);
+        io.to(gameId).emit("all cards", allCards);
+        
         const gamesList = Game.getActiveGamesList();
         io.emit("games list", gamesList);
       }
@@ -168,6 +173,23 @@ export function handleGameConnections(io, socket) {
       socket.emit(
         "error",
         "Erreur lors du déplacement de la carte vers le cimetière"
+      );
+    }
+  });
+
+  socket.on("move to hand", async ({ gameId, userId, cardId }) => {
+    try {
+      const player = await getPlayerByUserId(gameId, userId);
+      const game = Game.getGameById(gameId);
+      game.moveToHand(player, cardId);
+    } catch (error) {
+      console.error(
+        "Erreur lors du déplacement de la carte vers la main: ",
+        error
+      );
+      socket.emit(
+        "error",
+        "Erreur lors du déplacement de la carte vers la main"
       );
     }
   });
